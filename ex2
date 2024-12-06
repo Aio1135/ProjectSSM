@@ -1,0 +1,138 @@
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.Image;
+import java.awt.Point;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.Vector;
+
+import javax.swing.*;
+
+public class SnowFrame extends JFrame {
+	public SnowFrame() {
+		setTitle("눈 내리는 샤갈의 마을");
+		setSize(300,300);
+		setContentPane(new MyPanel());
+		
+		setVisible(true);
+	}
+	
+	class MyPanel extends JPanel {
+		private final int SNOWS = 50;
+		private final int SNOW_SIZE = 10;
+		private ImageIcon icon = new ImageIcon("back.jpg");
+		private Image img = icon.getImage();
+		private Vector<Point> v = new Vector<Point>(50);
+		private SnowThread snowThread = new SnowThread();
+		
+		public MyPanel() {
+			setBackground(Color.YELLOW);
+			
+			this.addComponentListener(new ComponentAdapter(){ //중요함 교재 p558~560
+				public void componentResized(ComponentEvent e) {
+					makeSnow();
+					snowThread.start();
+					MyPanel.this.removeComponentListener(this); //크기조정시 눈개수가 늘어나기때문에 추가하는 문장
+				}
+			});
+			
+			this.addMouseListener(new MouseAdapter() {
+				public void mousePressed(MouseEvent e) {
+					if(stopFlag == false)
+						stopThread();
+					else
+						resumeThread();
+					
+				}
+			});
+		}
+		
+		private void makeSnow() {
+			for(int i=0; i< SNOWS; i++) {
+				int x = (int)(Math.random()*250);
+				int y = (int)(Math.random()*250);
+				Point p = new Point(x, y);
+				v.add(p);
+			}
+		}
+		
+		private void fallSnow() {
+			for(int i=0; i<v.size(); i++) {
+				int xDir = 0; //xDestination이 적절함.
+				if(Math.random()>0.5)
+					xDir = -1;
+				else
+					xDir = 1;
+				xDir *= (int)(Math.random()*3);
+				
+				Point p = v.get(i);
+				p.x += xDir;
+				p.y += (int)(Math.random()*7);
+				
+				if(p.y > this.getHeight())
+					p.y = 5;
+			}
+		}
+		
+		@Override
+		public void paintComponent(Graphics g) {
+			super.paintComponent(g);
+			
+			g.drawImage(img, 0, 0, this.getWidth(), this.getHeight(), null);
+			
+			g.setColor(Color.WHITE);
+			for(int i = 0; i<v.size(); i++) {
+				Point p = v.get(i);
+				g.fillOval(p.x, p.y, SNOW_SIZE, SNOW_SIZE);
+			}
+		}
+		
+		private boolean stopFlag = false;
+		
+		private void stopThread() {
+			stopFlag = true;
+		}
+		
+		synchronized private void resumeThread() {
+			stopFlag = false;
+			this.notify(); //중요함. 스레드의 cpu사용 여부를 결정함. 
+		}
+		
+		synchronized private void checkWait() {
+			if(stopFlag == true)
+				try {
+					this.wait();//동기화함수
+				} catch (InterruptedException e) {
+					return;
+				}
+		}
+		
+		class SnowThread extends Thread{
+			@Override
+			public void run() {
+				while(true) {
+					checkWait();
+					/*if(stopFlag = false){ //폴링기법 cpu 사용량 많기 때문에 notify()사용 권장.
+						fallSnow();
+						repaint();
+					} */
+					fallSnow();
+					repaint();
+					try {
+						sleep(300);
+					} catch (InterruptedException e) {
+						return;
+					}
+				}
+			}
+			
+		}
+	}
+	
+	public static void main(String[] args) {
+		new SnowFrame();
+	}
+
+}
