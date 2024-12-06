@@ -1,0 +1,133 @@
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.Image;
+import java.awt.Point;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.Vector;
+
+import javax.swing.ImageIcon;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+
+public class CircleFrame extends JFrame{
+	public CircleFrame() {
+		setTitle("원그리기");
+		setSize(500,500);
+		setContentPane(new MyPanel());
+		setVisible(true);
+	}
+	
+	class MyPanel extends JPanel{
+		private ImageIcon icon = new ImageIcon("rain.jpg");
+		private Image img = icon.getImage();
+		
+		private Vector<Circle> v = new Vector<Circle>();
+		private Circle draggedCircle = null;
+		
+		public MyPanel() {
+			MyMouse ml = new MyMouse();
+			this.addMouseListener(ml);
+			this.addMouseMotionListener(ml);
+			MyThread th = new MyThread();
+			th.start();
+		}
+		
+		class MyThread extends Thread{
+			@Override
+			public void run() {
+				while(true) {
+					for(int i=0; i< v.size(); i++) {
+						Circle c = v.get(i);
+						if(c.decrease() == false) {
+							v.remove(c);
+							i--;
+						}
+						repaint();
+					}
+						try {
+							sleep(200);
+						} catch (InterruptedException e) {
+							return;
+						}
+				}
+			}
+		}
+		@Override
+		public void paintComponent(Graphics g) {
+			super.paintComponent(g);
+			g.drawImage(img, 0, 0, this.getWidth(),this.getHeight(), null);
+			g.setColor(Color.MAGENTA);
+			
+			for(Circle c : v) {
+				Point p = c.getLeftTopPoint();
+				g.drawOval(p.x, p.y, c.getSize(), c.getSize());
+			}
+			
+			if(draggedCircle == null)
+				return;
+			
+			Point p = draggedCircle.getLeftTopPoint();
+			g.drawOval(p.x, p.y, draggedCircle.getSize(), draggedCircle.getSize());
+		}
+		
+		class Circle{
+			private int x,y;
+			private int radius;
+			public Circle(int x, int y, int radius) {
+				this.x = x;
+				this.y = y;
+				this.radius = radius;
+			}
+			public Point getLeftTopPoint() {
+				return new Point(x-radius,y-radius);
+			}
+			public int getSize() {
+				return radius*2;
+			}
+			public boolean decrease() {
+				radius -= 5;
+				if(radius <= 0) {
+					radius = 0;
+					return false;
+				}
+				return true;
+			}
+		}
+		
+		class MyMouse extends MouseAdapter{
+			private Point startP = null; //마우스 시작 지점
+			@Override
+			public void mousePressed(MouseEvent e) {
+				startP = e.getPoint();
+			}
+			
+			@Override
+			public void mouseReleased(MouseEvent e) {
+				Point endP = e.getPoint(); //마우스를 뗀 지점
+				int d = (endP.x - startP.x)*(endP.x - startP.x) + 
+						(endP.y - startP.y)*(endP.y - startP.y);
+				int radius = (int)(Math.sqrt(d));
+				Circle c = new Circle(startP.x, startP.y, radius);
+				v.add(c);
+				draggedCircle = null; //마우스를 뗄 때 드래깅중인 원의 정보를 모두 삭제
+				repaint();
+			}
+			
+			@Override
+			public void mouseDragged(MouseEvent e) {
+				Point endP = e.getPoint(); //마우스를 뗀 지점
+				int d = (endP.x - startP.x)*(endP.x - startP.x) + 
+						(endP.y - startP.y)*(endP.y - startP.y);
+				int radius = (int)(Math.sqrt(d));
+				draggedCircle = new Circle(startP.x, startP.y, radius);
+				repaint();
+			}
+		}
+	}
+	
+	public static void main(String[] args) {
+		new CircleFrame();
+	}
+
+}
