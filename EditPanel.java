@@ -13,7 +13,7 @@ public class EditPanel extends JPanel {
 		this.setBackground(Color.CYAN);
 		this.add(tf);
 		
-		JButton editBtn = new JButton("추가");
+		JButton editBtn = new JButton("단어 추가");
 		this.add(editBtn);
 		
 		editBtn.addActionListener(new ActionListener() {
