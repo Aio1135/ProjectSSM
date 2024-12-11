@@ -4,6 +4,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.*;
 import java.util.List;
+import java.util.Random;
 import java.util.ArrayList;
 
 import javax.swing.*;
@@ -15,6 +16,7 @@ public class GamePanel extends JPanel {
     private GameGroundPanel ground = new GameGroundPanel();
     private HealthPanel healthPanel = new HealthPanel();
     private InputPanel input = new InputPanel();
+    private MusicControl eventMusics[] = new MusicControl[3]; //이벤트 효과음 객체
     private int speed = 300; // 단어의 기본 이동속도 설정
     private boolean gameOver = false; // 게임 오버 상태 확인용
     private String playerName = "Unknown"; // 기본 플레이어 이름
@@ -42,6 +44,7 @@ public class GamePanel extends JPanel {
     	ground.stopThreads(); //기존에 진행하고 있던 게임스레드 중지
         ground.initializeThreads(); //단어와 스레드 초기화
         ground.startThreads(); //단어들이 이동하기 시작
+        System.out.println("체력리셋됨");
         healthPanel.resetHealth(); //체력 초기화
         gameOver = false; //게임 오버 초기화
     }
@@ -67,13 +70,16 @@ public class GamePanel extends JPanel {
     }
     
     public class GameGroundPanel extends JPanel {
-        private JLabel[] fish = new JLabel[10];
+        private JLabel[] fish = new JLabel[10]; //물고기 객체
         private MovingThread[] threads = new MovingThread[10];
+        private double eventProbability = 0.03; //폭탄 및 보물상자 생성확률 
+        private Random random = new Random();
         
-        private ImageIcon bgIcon = new ImageIcon("backgroundImg.jpg");
-        private Image backgroundImg = bgIcon.getImage();
-        
-        private ImageIcon[] fishIcons = new ImageIcon[] {
+        private ImageIcon bgIcon = new ImageIcon("backgroundImg.jpg"); //배경화면
+        private Image backgroundImg = bgIcon.getImage();       
+        private ImageIcon bombIcon = new ImageIcon("bomb.png"); //폭탄이미지
+        private ImageIcon treasureIcon = new ImageIcon("treasure.png"); //보물상자이미지
+        private ImageIcon[] fishIcons = new ImageIcon[] { //물고기이미지
         		new ImageIcon("fish1.png"),
         		new ImageIcon("fish2.png"),
         		new ImageIcon("fish3.png")
@@ -97,17 +103,7 @@ public class GamePanel extends JPanel {
             System.out.println(playerLabel.getBounds());
             
             for (int i = 0; i < fish.length; i++) {
-            	ImageIcon randomFishIcon = fishIcons[(int) (Math.random() * fishIcons.length)];
-            	String word = textSource.get(); // 단어를 텍스트로 가져옵니다.
-                fish[i] = new JLabel(word, randomFishIcon, JLabel.CENTER); // 단어와 물고기 이미지 결합
-
-                fish[i].setSize(320, 100);
-                fish[i].setLocation((int)((Math.random() * 150)+750), (int)(Math.random() * 400)); //x는 500~650 y는 0~400 사이로 설정
-                fish[i].setForeground(Color.WHITE);
-                fish[i].setFont(fish[i].getFont().deriveFont(15f));
-                add(fish[i]);
-
-                threads[i] = new MovingThread(fish[i]); // 새로운 스레드 생성
+            	createNewFish(i);
             }
             repaint();
         }
@@ -145,27 +141,61 @@ public class GamePanel extends JPanel {
                 }
             }
         }
+        
+        public void createNewFish(int i) { //단어가 입력되고 나서 새로 생성
+        	ImageIcon randomFishIcon = fishIcons[(int) (Math.random() * fishIcons.length)];
+        	String word = textSource.get(); //txt파일에서 단어 가져옴
+        	double event = random.nextDouble();
+        	if(event < eventProbability / 2) { //폭탄 생성
+        		fish[i] = new JLabel(word, bombIcon, JLabel.CENTER);
+        		fish[i].putClientProperty("event", "bomb");
+        	}
+        	else if(event < eventProbability) { //보물상자 생성
+        		fish[i] = new JLabel(word, treasureIcon, JLabel.CENTER);
+        		fish[i].putClientProperty("event", "treasure");
+        	}
+        	else { //물고기 생성
+        		fish[i] = new JLabel(word, randomFishIcon, JLabel.CENTER);
+        		fish[i].putClientProperty("event", "fish");
+        	}
+        	fish[i].setSize(320, 100);
+            fish[i].setLocation((int)((Math.random() * 150)+750), (int)(Math.random() * 400)); //x는 500~650 y는 0~400 사이로 설정
+            fish[i].setForeground(Color.WHITE);
+            fish[i].setFont(fish[i].getFont().deriveFont(15f));
+            add(fish[i]);
+            threads[i] = new MovingThread(fish[i]); // 새로운 스레드 생성
+            threads[i].start();
+        }
+        
         public void checkInput(String input) {
+            eventMusics[1] = new MusicControl("C:/자바학습/MiniProject/gun.wav");
+            eventMusics[2] = new MusicControl("C:/자바학습/MiniProject/treasure.wav");
             for (int i = 0; i < fish.length; i++) { // 현재 이동 중인 단어들 중 일치하는지 확인
                 if (fish[i].getText().equals(input)) { // 사용자 입력값과 단어가 일치하면
-                    remove(fish[i]); // 화면에서 제거
-                    threads[i].stopThread(); // 스레드 중지
-                    scorePanel.increase(); // 점수 증가
+                    String eventType = (String)fish[i].getClientProperty("event"); //물고기, 보물상자, 폭탄 중 어느 것에 속하는지 구별
+                    if(eventType.equals("bomb")) { //폭탄 단어를 친 경우
+                    	for(int j=0; j < fish.length; j++) {
+                    		remove(fish[j]);
+                    		threads[j].stopThread();
+                    		scorePanel.increase(5);
+                    		createNewFish(j);
+                    	}
+                    }
+                    else if(eventType.equals("treasure")) { //보물상자 단어를 친 경우
+                    	eventMusics[2].play(false);
+                        remove(fish[i]); // 화면에서 제거
+                        threads[i].stopThread(); // 스레드 중지
+                        scorePanel.increase(100); // 점수 증가
+                        createNewFish(i);
+                    }
+                    else { //그냥 물고기인 경우
+                        eventMusics[1].play(false);
+                        remove(fish[i]); // 화면에서 제거
+                        threads[i].stopThread(); // 스레드 중지
+                        scorePanel.increase(10); // 점수 증가
+                        createNewFish(i);
+                    }
                     repaint();
-
-                    // 단어 새로 생성
-                    ImageIcon randomFishIcon = fishIcons[(int) (Math.random() * fishIcons.length)];
-                    String word = textSource.get();
-                    fish[i] = new JLabel(word, randomFishIcon, JLabel.CENTER);
-                    
-                    fish[i].setSize(320, 100);
-                    fish[i].setLocation(890, (int) (Math.random() * 400));
-                    fish[i].setForeground(Color.WHITE);
-                    fish[i].setFont(fish[i].getFont().deriveFont(15f));
-                    add(fish[i]);
-                    
-                    threads[i] = new MovingThread(fish[i]); // 새 스레드 생성
-                    threads[i].start();
                     break;
                 }
             }
@@ -271,6 +301,7 @@ public class GamePanel extends JPanel {
         
         @Override
         public void run() {
+        	eventMusics[0] = new MusicControl("C:/자바학습/MiniProject/crash.wav");
         	running = true;
             while (running) {
             	checkWait(); //일시정지인지 확인
