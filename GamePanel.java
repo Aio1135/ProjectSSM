@@ -41,11 +41,11 @@ public class GamePanel extends JPanel {
 
     public void startGame() {
     	scorePanel.resetScore(); //게임 재시작시 스코어 리셋
+    	System.out.println("체력리셋됨");
+        healthPanel.resetHealth(); //체력 초기화
     	ground.stopThreads(); //기존에 진행하고 있던 게임스레드 중지
         ground.initializeThreads(); //단어와 스레드 초기화
         ground.startThreads(); //단어들이 이동하기 시작
-        System.out.println("체력리셋됨");
-        healthPanel.resetHealth(); //체력 초기화
         gameOver = false; //게임 오버 초기화
     }
     
@@ -311,6 +311,7 @@ public class GamePanel extends JPanel {
                         if (x < 0) { // 화면 밖으로 나가면 오른쪽 끝으로 재배치하고 체력감소
                             label.setLocation(650, label.getY());
                             healthPanel.decreaseHealth(); // 체력 감소
+                            eventMusics[0].play(false);
                                 if (!isGameOver() && healthPanel.getHealth() <= 0) { // 체력이 0일 때
                                 	setGameOver(true);
                                 	saveScore(playerName);
