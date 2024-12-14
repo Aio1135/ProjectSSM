@@ -1,10 +1,20 @@
+#define _CRT_SECURE_NO_WARNINGS
+#define max(a,b) ((a) > (b) ? (a) : (b))
+#define MAX_WORD_LEN 50
+#define MAX_MEAN_LEN 100
+
 #include <stdio.h>
 #include <stdlib.h>
-#define max(a,b) ((a) > (b) ? (a) : (b))
+#include <string.h>
+#include <time.h>
+
+using namespace std;
+
 //AVL 트리 노드 정의
 typedef struct AVLNode
 {
-	int key;
+	char key[MAX_WORD_LEN]; //단어
+	char mean[MAX_MEAN_LEN]; //단어의 의미
 	struct AVLNode* left;
 	struct AVLNode* right;
 }AVLNode;
@@ -27,9 +37,10 @@ int get_balance(AVLNode* node) {
 }
 
 //노드를 동적으로 생성하는 함수
-AVLNode* create_node(int key) {
+AVLNode* create_node(const char* key, const char* mean) {
 	AVLNode* node = (AVLNode*)malloc(sizeof(AVLNode));
-	node->key = key;
+	strncpy(node->key, key, MAX_WORD_LEN); //단어를 복사
+	strncpy(node->mean, mean, MAX_MEAN_LEN); //의미를 복사
 	node->left = NULL;
 	node->right = NULL;
 	return(node);
@@ -55,15 +66,15 @@ AVLNode* rotate_left(AVLNode* parent) {
 
 //AVL 트리에 새로운 노드 추가함수
 //새로운 루트를 반환한다.
-AVLNode* insert(AVLNode* node, int key) {
+AVLNode* insert(AVLNode* node, const char* key, const char* mean) {
 	//이진 탐색트리의 노드 추가 수행
 	if (node == NULL)
-		return (create_node(key));
+		return (create_node(key, mean));
 
-	if (key < node->key)
-		node->left = insert(node->left, key);
-	else if (key > node->key)
-		node->right = insert(node->right, key);
+	if (strcmp(key, node->key) < 0) // key값의 단어가 node->key의 단어보다 사전상? 앞의 단어일때
+		node->left = insert(node->left, key, mean);
+	else if (strcmp(key, node->key) > 0)
+		node->right = insert(node->right, key, mean);
 	else
 		return node;
 
@@ -71,48 +82,85 @@ AVLNode* insert(AVLNode* node, int key) {
 	int balance = get_balance(node);
 
 	//LL타입 처리
-	if (balance > 1 && key < node->left->key)
+	if (balance > 1 && strcmp(key, node->left->key) < 0)
 		return rotate_right(node);
 
 	//RR타입 처리
-	if (balance < -1 && key > node->right->key)
+	if (balance < -1 && strcmp(key, node->right->key))
 		return rotate_left(node);
 
 	//LR타입 처리
-	if (balance > 1 && key > node->left->key) {
+	if (balance > 1 && strcmp(key, node->left->key))
+	{
 		node->left = rotate_left(node->left);
 		return rotate_right(node);
 	}
 
 	//RL타입 처리
-	if (balance < -1 && key < node->right->key) {
+	if (balance < -1 && strcmp(key, node->right->key))
+	{
 		node->right = rotate_right(node->right);
 		return rotate_left(node);
 	}
 	return node;
 }
 
+AVLNode* search(AVLNode* root, const char* key) { //이진탐색트리 교재 p298 - 순환적인 탐색함수 프로그램 참고
+	if (root == NULL || strcmp(root->key, key) == 0) //root가 x 또는 root단어와 찾고자 하는 단어가 일치
+		return root;
+	if (strcmp(key, root->key) < 0) //찾고자 하는 단어가 root 단어보다 사전상 앞에 있으면
+		return search(root->left, key);
+	else
+		return search(root->right, key); //찾고자 하는 단어가 root단어보다 사전상 뒤에 있다면
+}
+
 //전위 순회 함수
 void preorder(AVLNode* root) {
 	if (root != NULL) {
-		printf("[%d] ", root->key);
+		printf("단어 : %s 의미 : %s \n", root->key, root->mean);
 		preorder(root->left);
 		preorder(root->right);
 	}
 }
 
+void loadTXT(const char* filepath, AVLNode** root) { //root를 포인터로 받습니다.
+	FILE* file = fopen(filepath, "r");
+	if (file == NULL) {
+		printf("파일을 찾을 수 없습니다.\n");
+		return;
+	}
+
+	char word[MAX_WORD_LEN], mean[MAX_MEAN_LEN];
+
+	// 파일에서 한 줄씩 읽기
+	while (fscanf(file, "%s %s", word, mean) != EOF) {
+		// 단어와 의미를 AVL 트리에 추가
+		*root = insert(*root, word, mean);  // 삽입할 때마다 새로운 루트를 반환받음
+	}
+
+	fclose(file);
+}
+
 int main(void) {
 	AVLNode* root = NULL;
-	//예제 트리구축
-	root = insert(root, 10);
-	root = insert(root, 20);
-	root = insert(root, 30);
-	root = insert(root, 40);
-	root = insert(root, 50);
-	root = insert(root, 29);
-
+	time_t start1 = time(NULL);
+	loadTXT("C:\\Users\\심승민\\words.txt", &root);
+	time_t end1 = time(NULL);
+	printf("AVL트리 소요시간: %lf\n", (double)(end1 - start1));
 	printf("전위 순회 결과 \n");
 	preorder(root);
 
+	char searchWord[MAX_WORD_LEN];
+
+	printf("의미를 검색할 단어 입력: ");
+	scanf("%s", searchWord);
+	time_t start2 = time(NULL);
+	AVLNode* result = search(root, searchWord);
+	time_t end2 = time(NULL);
+	printf("탐색 소요시간: %lf\n", (double)(end2 - start2));
+	if (result != NULL)
+		printf("단어: %s, 의미: %s\n", result->key, result->mean);
+	else
+		printf("단어를 찾을 수 없습니다.");
 	return 0;
 }
